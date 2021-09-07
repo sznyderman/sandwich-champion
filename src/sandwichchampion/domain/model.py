@@ -6,6 +6,12 @@ class Sandwich:
         self.name = name
         self.rating = 1000
 
+    def __eq__(self, rhs):
+        if isinstance(rhs, Sandwich):
+            return self.name == rhs.name
+
+        return False
+
 
 def update_ratings(winner: Sandwich, loser: Sandwich):
     def calculate_change():
