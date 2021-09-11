@@ -33,6 +33,13 @@ def sqlite_session_factory(in_memory_sqlite_db):
     yield sessionmaker(bind=in_memory_sqlite_db)
 
 
+def insert_sandwich(session, name, rating):
+    session.execute(
+        "INSERT INTO sandwiches (name, rating) VALUES (:name, :rating)",
+        dict(name=name, rating=rating),
+    )
+
+
 def test_add_sandwich(sqlite_session_factory):
     uow = unit_of_work.SqlAlchemyUnitOfWork(sqlite_session_factory)
 
@@ -48,15 +55,37 @@ def test_add_sandwich(sqlite_session_factory):
 
 def test_get_sandwich(sqlite_session_factory):
     session = sqlite_session_factory()
-    session.execute(
-        "INSERT INTO sandwiches (name, rating) VALUES "
-        '("Grilled Cheese", 1000),'
-        '("Caprese", 1000)'
-    )
+    insert_sandwich(session, "Grilled Cheese", 1000)
+    insert_sandwich(session, "Caprese", 1000)
+
     session.commit()
 
     uow = unit_of_work.SqlAlchemyUnitOfWork(sqlite_session_factory)
     with uow:
         sw = uow.sandwiches.get_sandwich("Grilled Cheese")
+        assert sw.name == "Grilled Cheese"
 
-    assert sw.name == "Grilled Cheese"
+
+def test_rolls_back_uncommitted_word_by_default(sqlite_session_factory):
+    uow = unit_of_work.SqlAlchemyUnitOfWork(sqlite_session_factory)
+    with uow:
+        insert_sandwich(uow.session, "Bahn Mi", 1000)
+
+    session = sqlite_session_factory()
+    rows = list(session.execute('SELECT * FROM "sandwiches"'))
+    assert rows == []
+
+
+def test_rolls_back_on_error(sqlite_session_factory):
+    class MyException(Exception):
+        pass
+
+    uow = unit_of_work.SqlAlchemyUnitOfWork(sqlite_session_factory)
+    with pytest.raises(MyException):
+        with uow:
+            insert_sandwich(uow.session, "Grilled Cheese", 1000)
+            raise MyException()
+
+    new_session = sqlite_session_factory()
+    rows = list(new_session.execute('SELECT * FROM "sandwiches"'))
+    assert rows == []
