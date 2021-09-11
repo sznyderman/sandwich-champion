@@ -8,3 +8,4 @@ def test_api_is_running():
 
     assert r.status_code == 200
     assert r.json()["message"] == "It's alive!"
+
