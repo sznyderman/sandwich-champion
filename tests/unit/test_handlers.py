@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from sandwichchampion.domain import model
-from sandwichchampion.adapters import repository
+from sandwichchampion.adapters import repository, notifications
 from sandwichchampion.service_layer import unit_of_work, handlers, messagebus
 
 
@@ -31,10 +31,20 @@ class FakeUnitOfWork(unit_of_work.AbstractUnitOfWork):
         pass
 
 
+class FakeNotifications(notifications.AbstractNotification):
+    def __init__(self):
+        self.sent = []
+
+    def send(self, message):
+        self.sent.append(message)
+
+
 @pytest.fixture
 def bus():
     uow = FakeUnitOfWork()
-    bus = messagebus.MessageBus(uow, handlers.command_handlers)
+    bus = messagebus.MessageBus(
+        uow, handlers.command_handlers, handlers.event_handlers, FakeNotifications()
+    )
     return bus
 
 
@@ -50,3 +60,8 @@ class TestCreateSandwich:
 
         with pytest.raises(handlers.DuplicateSandwichNameError):
             bus.handle(handlers.CreateSandwichCommand(name="Grilled Cheese"))
+
+    def test_sends_notification_that_a_new_sandwich_was_created(self, bus):
+        bus.handle(handlers.CreateSandwichCommand(name="Grilled Cheese"))
+
+        assert bus.notifications.sent == ["New sandwich: Grilled Cheese."]

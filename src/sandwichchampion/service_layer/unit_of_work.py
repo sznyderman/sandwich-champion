@@ -7,6 +7,7 @@ class AbstractUnitOfWork(abc.ABC):
     sandwiches: repository.AbstractRepository
 
     def __enter__(self) -> AbstractUnitOfWork:
+        self.events = []
         return self
 
     def __exit__(self, *args):
