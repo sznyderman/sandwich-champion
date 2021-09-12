@@ -4,7 +4,7 @@ import pytest
 
 from sandwichchampion.domain import model
 from sandwichchampion.adapters import repository
-from sandwichchampion.service_layer import unit_of_work, handlers
+from sandwichchampion.service_layer import unit_of_work, handlers, messagebus
 
 
 class FakeRepository(repository.AbstractRepository):
@@ -31,18 +31,22 @@ class FakeUnitOfWork(unit_of_work.AbstractUnitOfWork):
         pass
 
 
+@pytest.fixture
+def bus():
+    uow = FakeUnitOfWork()
+    bus = messagebus.MessageBus(uow, handlers.command_handlers)
+    return bus
+
+
 class TestCreateSandwich:
-    def test_add_sandwich(self):
-        uow = FakeUnitOfWork()
+    def test_add_sandwich(self, bus):
+        bus.handle(handlers.CreateSandwichCommand(name="Grilled Cheese"))
 
-        handlers.create_sandwich("Grilled Cheese", uow)
+        assert bus.uow.sandwiches.get_sandwich("Grilled Cheese") is not None
+        assert bus.uow.committed
 
-        assert uow.sandwiches.get_sandwich("Grilled Cheese") is not None
-        assert uow.committed
-
-    def test_adding_a_sandwich_with_a_name_that_is_already_assigned_raises(self):
-        uow = FakeUnitOfWork()
-        uow.sandwiches.add(model.Sandwich("Grilled Cheese"))
+    def test_adding_a_sandwich_with_a_name_that_is_already_assigned_raises(self, bus):
+        bus.handle(handlers.CreateSandwichCommand(name="Grilled Cheese"))
 
         with pytest.raises(handlers.DuplicateSandwichNameError):
-            handlers.create_sandwich("Grilled Cheese", uow)
+            bus.handle(handlers.CreateSandwichCommand(name="Grilled Cheese"))
