@@ -12,6 +12,9 @@ class Sandwich:
 
         return False
 
+    def __hash__(self):
+        return hash(self.name)
+
 
 def update_ratings(winner: Sandwich, loser: Sandwich):
     def calculate_change():
